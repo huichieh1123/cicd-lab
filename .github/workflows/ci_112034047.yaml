@@ -1,0 +1,48 @@
+name: CI - 112034047
+
+on:
+  push:
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+jobs:
+  ci:
+    name: Typecheck / Prettier / Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Prettier check
+        run: npm run format:check
+
+      - name: Prepare test report directory
+        run: mkdir -p reports
+
+      - name: Run tests
+        run: npm run test:ci
+
+      - name: Publish test report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: Vitest Test Results
+          path: reports/junit.xml
+          reporter: java-junit
+          fail-on-error: false
