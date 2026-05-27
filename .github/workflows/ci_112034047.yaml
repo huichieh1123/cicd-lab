@@ -63,4 +63,3 @@ jobs:
             echo "| Prettier check       | ${{ steps.prettier.outcome }} |"
             echo "| Vitest tests         | ${{ steps.tests.outcome }} |"
           } >> "$GITHUB_STEP_SUMMARY"
-
