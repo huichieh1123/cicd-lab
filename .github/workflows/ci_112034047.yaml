@@ -24,89 +24,23 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: |
-          set +e
-
-          npm install > install.log 2>&1
-          status=$?
-
-          cat install.log
-
-          if [ $status -ne 0 ]; then
-            touch install_failed
-            echo "::error title=Install dependencies failed::npm install failed. Please check package.json and package-lock.json."
-          fi
-
-          exit 0
+        run: npm install
 
       - name: TypeScript typecheck
-        run: |
-          set +e
-
-          if [ -f install_failed ]; then
-            touch typecheck_skipped
-            echo "TypeScript typecheck skipped because dependency installation failed." > typecheck.log
-            exit 0
-          fi
-
-          npm run typecheck > typecheck.log 2>&1
-          status=$?
-
-          cat typecheck.log
-
-          if [ $status -ne 0 ]; then
-            touch typecheck_failed
-            echo "::error title=TypeScript typecheck failed::TypeScript type checking failed. Check typecheck.log in CI Summary."
-          fi
-
-          exit 0
+        id: typecheck
+        run: npm run typecheck
 
       - name: Prettier check
-        run: |
-          set +e
-
-          if [ -f install_failed ]; then
-            touch prettier_skipped
-            echo "Prettier check skipped because dependency installation failed." > prettier.log
-            exit 0
-          fi
-
-          npm run format:check > prettier.log 2>&1
-          status=$?
-
-          cat prettier.log
-
-          if [ $status -ne 0 ]; then
-            touch prettier_failed
-            echo "::error title=Prettier check failed::Prettier found formatting issues. Run npm run format to fix."
-          fi
-
-          exit 0
+        id: prettier
+        run: npm run format:check
 
       - name: Prepare test report directory
+        id: tests
         run: mkdir -p reports
 
       - name: Run tests
-        run: |
-          set +e
-
-          if [ -f install_failed ]; then
-            touch test_skipped
-            echo "Vitest tests skipped because dependency installation failed." > test.log
-            exit 0
-          fi
-
-          npm run test:ci > test.log 2>&1
-          status=$?
-
-          cat test.log
-
-          if [ $status -ne 0 ]; then
-            touch test_failed
-            echo "::error title=Vitest tests failed::Some Vitest tests failed. Check CI Summary for details."
-          fi
-
-          exit 0
+        id: tests
+        run: npm run test:ci
 
       - name: Publish test report
         uses: dorny/test-reporter@v2
@@ -120,99 +54,13 @@ jobs:
       - name: CI Summary
         if: always()
         run: |
-          echo "# CI Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "# CI Summary"
+            echo ""
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| TypeScript typecheck | ${{ steps.typecheck.outcome }} |"
+            echo "| Prettier check       | ${{ steps.prettier.outcome }} |"
+            echo "| Vitest tests         | ${{ steps.tests.outcome }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "## Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-
-          if [ -f install_failed ]; then
-            echo "| Install dependencies | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Install dependencies | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ -f typecheck_failed ]; then
-            echo "| TypeScript typecheck | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
-          elif [ -f typecheck_skipped ]; then
-            echo "| TypeScript typecheck | ⚠️ Skipped |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| TypeScript typecheck | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ -f prettier_failed ]; then
-            echo "| Prettier check | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
-          elif [ -f prettier_skipped ]; then
-            echo "| Prettier check | ⚠️ Skipped |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Prettier check | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ -f test_failed ]; then
-            echo "| Vitest tests | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
-          elif [ -f test_skipped ]; then
-            echo "| Vitest tests | ⚠️ Skipped |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| Vitest tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ -f install_failed ]; then
-            echo "## ❌ Install Dependencies Error" >> $GITHUB_STEP_SUMMARY
-            echo '```text' >> $GITHUB_STEP_SUMMARY
-            cat install.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ -f typecheck_failed ]; then
-            echo "## ❌ TypeScript Typecheck Error" >> $GITHUB_STEP_SUMMARY
-            echo '```text' >> $GITHUB_STEP_SUMMARY
-            cat typecheck.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ -f prettier_failed ]; then
-            echo "## ❌ Prettier Error" >> $GITHUB_STEP_SUMMARY
-            echo '```text' >> $GITHUB_STEP_SUMMARY
-            cat prettier.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Fix command:" >> $GITHUB_STEP_SUMMARY
-            echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo "npm run format" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ -f test_failed ]; then
-            echo "## ❌ Vitest Test Error" >> $GITHUB_STEP_SUMMARY
-            echo '```text' >> $GITHUB_STEP_SUMMARY
-            cat test.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Fail pipeline if any check failed
-        run: |
-          if [ -f install_failed ]; then
-            echo "::error title=CI failed::Install dependencies failed."
-            exit 1
-          fi
-
-          if [ -f typecheck_failed ]; then
-            echo "::error title=CI failed::TypeScript typecheck failed."
-            exit 1
-          fi
-
-          if [ -f prettier_failed ]; then
-            echo "::error title=CI failed::Prettier check failed."
-            exit 1
-          fi
-
-          if [ -f test_failed ]; then
-            echo "::error title=CI failed::Vitest tests failed."
-            exit 1
-          fi
-
-          echo "All CI checks passed."
