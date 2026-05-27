@@ -1,4 +1,21 @@
-name: CI - 112034047
+- name: CI Summary
+  if: always()
+  run: |
+    echo "# CI Summary" >> $GITHUB_STEP_SUMMARY
+
+    echo "## Results" >> $GITHUB_STEP_SUMMARY
+
+    if [ -f prettier_failed ]; then
+      echo "- ❌ Prettier failed" >> $GITHUB_STEP_SUMMARY
+    else
+      echo "- ✅ Prettier passed" >> $GITHUB_STEP_SUMMARY
+    fi
+
+    if [ -f test_failed ]; then
+      echo "- ❌ Tests failed" >> $GITHUB_STEP_SUMMARY
+    else
+      echo "- ✅ Tests passed" >> $GITHUB_STEP_SUMMARY
+    fi
 
 on:
   push:
